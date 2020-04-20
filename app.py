@@ -1,18 +1,18 @@
 import os
+import shutil
 #from functions import *
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, after_this_request
 from spleeter.separator import Separator
 from werkzeug.utils import secure_filename
 
+app = Flask(__name__)
+APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 def separate_file(initial, destination):
     separator = Separator('spleeter:2stems')
     print(initial, destination)
     print('this is where it fails')
     separator.separate_to_file(initial, destination)
-
-app = Flask(__name__)
-APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 @app.route("/")
 def index():
@@ -28,12 +28,11 @@ def upload():
     #for file in request.files.getlist("file"):
     file = request.files['file']
     filename = secure_filename(file.filename)
-
     destination = os.path.join(APP_ROOT, filename)
+
     print(APP_ROOT)
     print(filename)
     print(os.path.join(APP_ROOT, filename))
-    # file.save(filename)
 
     file.save(os.path.join(target, filename)) #saves file to folder
 
@@ -51,6 +50,15 @@ def upload():
 
     path_to_file = roots[1] + "/" + file1[1][1] #the path for the relevant files (vocals)
 
+    #Delete file after processing
+    @after_this_request
+    def remove_file(response):
+        try:
+            os.remove(target+"/"+filename)
+            shutil.rmtree(destination)
+        except Exception as error:
+            app.logger.error("Error removing or closing downloaded file handle", error)
+        return response
     return send_file(
         path_to_file,
         mimetype="audio/wav",
